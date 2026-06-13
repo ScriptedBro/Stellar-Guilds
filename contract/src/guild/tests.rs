@@ -6,6 +6,7 @@
 #![cfg(test)]
 
 use crate::guild::types::Role;
+use crate::InitializerProof;
 use crate::{StellarGuildsContract, StellarGuildsContractClient};
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::{Address, Env, String};
@@ -30,6 +31,7 @@ fn create_test_guild(client: &StellarGuildsContractClient<'_>, env: &Env, owner:
         &String::from_str(env, "Test Guild"),
         &String::from_str(env, "A guild for testing"),
         owner,
+        &None::<InitializerProof>,
     )
 }
 

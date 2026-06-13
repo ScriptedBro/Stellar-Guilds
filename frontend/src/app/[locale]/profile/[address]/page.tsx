@@ -3,12 +3,11 @@ import {
   mockUser,
   mockStats,
   mockAchievements,
-  mockActivity,
 } from "@/features/profile/mockData";
 import { ReputationCard } from "@/features/profile/components/ReputationCard";
 import { StatsOverview } from "@/features/profile/components/StatsOverview";
 import { AchievementGrid } from "@/features/profile/components/AchievementGrid";
-import { ActivityTimeline } from "@/features/profile/components/ActivityTimeline";
+import ActivityFeed from "@/components/Profile/ActivityFeed";
 
 // social additions
 import { ProfileSocialSection } from "@/components/Profile/ProfileSocialSection";
@@ -100,7 +99,7 @@ export default async function ProfilePage({
             <AchievementGrid achievements={mockAchievements} />
           </div>
           <div className="lg:col-span-1">
-            <ActivityTimeline activities={mockActivity} />
+            <ActivityFeed />
           </div>
         </div>
 

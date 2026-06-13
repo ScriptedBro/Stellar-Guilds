@@ -2,6 +2,7 @@
 mod tests {
     use crate::governance::{ProposalType, VoteDecision};
     use crate::multisig::types::{OperationStatus, OperationType, TIMEOUT_24H, TIMEOUT_48H};
+    use crate::InitializerProof;
     use crate::{StellarGuildsContract, StellarGuildsContractClient};
     use soroban_sdk::testutils::{Address as _, Ledger as _, LedgerInfo};
     use soroban_sdk::{Address, Env, String, Vec};
@@ -192,7 +193,8 @@ mod tests {
         // Treasury setup
         let guild_name = String::from_str(&env, "Treasury Guild");
         let guild_desc = String::from_str(&env, "Guild for treasury integration");
-        let guild_id = client.create_guild(&guild_name, &guild_desc, &owner);
+        let guild_id =
+            client.create_guild(&guild_name, &guild_desc, &owner, &None::<InitializerProof>);
 
         let mut treasury_signers = Vec::new(&env);
         treasury_signers.push_back(owner.clone());
@@ -235,7 +237,8 @@ mod tests {
 
         let guild_name = String::from_str(&env, "Gov Guild");
         let guild_desc = String::from_str(&env, "Guild for governance integration");
-        let guild_id = client.create_guild(&guild_name, &guild_desc, &owner);
+        let guild_id =
+            client.create_guild(&guild_name, &guild_desc, &owner, &None::<InitializerProof>);
 
         let title = String::from_str(&env, "General decision");
         let description = String::from_str(&env, "Should we proceed?");

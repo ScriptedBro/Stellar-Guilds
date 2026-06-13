@@ -1,6 +1,7 @@
-﻿#[cfg(test)]
+#[cfg(test)]
 mod tests {
     use crate::treasury::types::{Allowance, TransactionStatus, TransactionType, Treasury};
+    use crate::InitializerProof;
     use crate::StellarGuildsContract;
     use crate::StellarGuildsContractClient;
     use soroban_sdk::testutils::{Address as _, Ledger, LedgerInfo};
@@ -35,7 +36,7 @@ mod tests {
     fn setup_guild(client: &StellarGuildsContractClient<'_>, env: &Env, owner: &Address) -> u64 {
         let name = String::from_str(env, "Test Guild");
         let description = String::from_str(env, "A test guild");
-        client.create_guild(&name, &description, owner)
+        client.create_guild(&name, &description, owner, &None::<InitializerProof>)
     }
 
     fn create_treasury(

@@ -8,6 +8,7 @@
 
 use crate::bounty::types::{BountyStatus, PayoutSplit};
 use crate::guild::types::Role;
+use crate::InitializerProof;
 use crate::StellarGuildsContract;
 use crate::StellarGuildsContractClient;
 use soroban_sdk::testutils::{Address as _, Ledger, LedgerInfo};
@@ -59,7 +60,7 @@ fn get_token_balance(env: &Env, token: &Address, addr: &Address) -> i128 {
 fn setup_guild(client: &StellarGuildsContractClient<'_>, env: &Env, owner: &Address) -> u64 {
     let name = String::from_str(env, "Test Guild");
     let description = String::from_str(env, "A test guild for bounties");
-    client.create_guild(&name, &description, owner)
+    client.create_guild(&name, &description, owner, &None::<InitializerProof>)
 }
 
 fn payout_split(recipient: &Address, bps: u32) -> PayoutSplit {

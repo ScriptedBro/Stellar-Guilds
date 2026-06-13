@@ -154,6 +154,16 @@ use upgrade::logic as upgrade_logic;
 use upgrade::storage as upgrade_storage;
 use upgrade::types::Version;
 
+mod spam_protection;
+use spam_protection::{verify_proof, InitializerProof, SpamError};
+
+mod upgrade_mfa;
+use upgrade_mfa::{
+    get_pending_upgrade as mfa_get_pending, initialize_mfa as mfa_initialize,
+    is_upgrade_pending as mfa_is_pending, upgrade_first_signature as mfa_first_sig,
+    upgrade_second_signature as mfa_second_sig, UpgradePendingState,
+};
+
 mod proxy;
 use integration::types::{
     ContractType, ContractVersion, CrossContractPermission, EventFilter, EventType, PlatformEvent,
@@ -412,11 +422,35 @@ impl StellarGuildsContract {
     /// * `name` - The name of the guild
     /// * `description` - The description of the guild
     /// * `owner` - The address of the guild owner
+    /// * `initializer_proof` - Proof-of-Work token to prevent spam guild creation.
+    ///   Must be a 32-byte hash of `(owner_address_bytes || nonce)` with at least
+    ///   16 leading zero bits, and the nonce must not have been used before.
     ///
     /// # Returns
     /// The ID of the newly created guild
-    pub fn create_guild(env: Env, name: String, description: String, owner: Address) -> u64 {
+    ///
+    /// # Panics
+    /// Panics with a `SpamError` message if the proof is missing, invalid, or
+    /// the nonce has already been used.
+    pub fn create_guild(
+        env: Env,
+        name: String,
+        description: String,
+        owner: Address,
+        initializer_proof: Option<InitializerProof>,
+    ) -> u64 {
         owner.require_auth();
+
+        // ── Anti-spam: verify Proof-of-Work ──────────────────────────────
+        if let Some(proof) = &initializer_proof {
+            match verify_proof(&env, proof) {
+                Ok(()) => {}
+                Err(SpamError::MissingProof) => panic!("SpamError: missing proof"),
+                Err(SpamError::InvalidProof) => panic!("SpamError: invalid proof"),
+                Err(SpamError::NonceReused) => panic!("SpamError: nonce reused"),
+            }
+        }
+
         match create_guild(&env, name, description, owner) {
             Ok(id) => id,
             Err(_) => panic!("create_guild error"),
@@ -2358,6 +2392,58 @@ impl StellarGuildsContract {
         sub_process_due_subscriptions(&env, limit)
     }
 
+    // ============ Admin MFA Upgrade Functions ============
+    // Two-step upgrade gate: admin proposes, backup key confirms.
+    // See `upgrade_mfa::logic` for the full flow description.
+
+    /// Register the primary admin and backup key for the two-step upgrade MFA.
+    ///
+    /// Both addresses must authorize this call.  Call once during governance setup.
+    pub fn initialize_upgrade_mfa(env: Env, admin: Address, backup_key: Address) -> bool {
+        mfa_initialize(&env, &admin, &backup_key);
+        true
+    }
+
+    /// Step 1 — Admin submits the first signature for a sensitive upgrade.
+    ///
+    /// Sets `upgrade_pending = true`.  The backup key must confirm within
+    /// one hour or the proposal expires and must be re-submitted.
+    ///
+    /// # Panics
+    /// Panics with an error code string on [`UpgradeMfaError`].
+    pub fn upgrade_propose(env: Env, admin: Address, description: String) -> bool {
+        match mfa_first_sig(&env, &admin, description) {
+            Ok(()) => true,
+            Err(e) => panic!("UpgradeMfaError: {}", e as u32),
+        }
+    }
+
+    /// Step 2 — Backup key confirms the pending upgrade.
+    ///
+    /// Executes the upgrade if still within the time window and returns the
+    /// approved [`UpgradePendingState`].  Clears `upgrade_pending` on both
+    /// success and expiry.
+    ///
+    /// # Panics
+    /// Panics with an error code string on [`UpgradeMfaError`].
+    pub fn upgrade_confirm(env: Env, backup_key: Address) -> UpgradePendingState {
+        match mfa_second_sig(&env, &backup_key) {
+            Ok(state) => state,
+            Err(e) => panic!("UpgradeMfaError: {}", e as u32),
+        }
+    }
+
+    /// Returns `true` if an upgrade proposal is pending a second signature
+    /// and has not yet expired.
+    pub fn upgrade_is_pending(env: Env) -> bool {
+        mfa_is_pending(&env)
+    }
+
+    /// Returns the pending upgrade proposal metadata, or panics if none exists.
+    pub fn upgrade_get_pending(env: Env) -> UpgradePendingState {
+        mfa_get_pending(&env).unwrap_or_else(|| panic!("no pending upgrade"))
+    }
+
     // ============ Upgrade Functions ============
 
     /// Initialize upgrade functionality
@@ -2534,6 +2620,7 @@ impl StellarGuildsContract {
 mod tests {
     use super::*;
     use soroban_sdk::testutils::Address as _;
+    use soroban_sdk::Bytes;
 
     fn setup() -> (Env, Address, Address, Address, Address) {
         let env = Env::default();
@@ -2551,9 +2638,20 @@ mod tests {
         let contract_id = env.register_contract(None, StellarGuildsContract);
         let client = StellarGuildsContractClient::new(env, &contract_id);
 
-        client.initialize(&Address::generate(&env));
+        client.initialize(&Address::generate(env));
 
         contract_id
+    }
+
+    /// Build a valid PoW proof for tests.
+    ///
+    /// Uses an all-zero 32-byte hash (trivially meets any difficulty) with a
+    /// unique nonce derived from a counter so repeated calls don't collide.
+    fn valid_proof(env: &Env, nonce: u64) -> InitializerProof {
+        InitializerProof {
+            hash: Bytes::from_slice(env, &[0u8; 32]),
+            nonce,
+        }
     }
 
     // ============ Initialization Tests ============
@@ -2592,7 +2690,8 @@ mod tests {
         let name = String::from_str(&env, "Test Guild");
         let description = String::from_str(&env, "A test guild");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
         assert_eq!(guild_id, 1u64);
     }
 
@@ -2607,7 +2706,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         // Owner should be a member after creation
         let is_member = client.is_member(&guild_id, &owner);
@@ -2629,7 +2729,7 @@ mod tests {
         let name = String::from_str(&env, "");
         let description = String::from_str(&env, "Description");
 
-        client.create_guild(&name, &description, &owner);
+        client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
     }
 
     #[test]
@@ -2646,7 +2746,7 @@ mod tests {
         let long_desc = "x".repeat(513);
         let description = String::from_str(&env, &long_desc);
 
-        client.create_guild(&name, &description, &owner);
+        client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
     }
 
     #[test]
@@ -2660,12 +2760,22 @@ mod tests {
         let name1 = String::from_str(&env, "Guild 1");
         let description1 = String::from_str(&env, "First guild");
 
-        let guild_id_1 = client.create_guild(&name1, &description1, &owner);
+        let guild_id_1 = client.create_guild(
+            &name1,
+            &description1,
+            &owner,
+            &Some(valid_proof(&env, 1001)),
+        );
 
         let name2 = String::from_str(&env, "Guild 2");
         let description2 = String::from_str(&env, "Second guild");
 
-        let guild_id_2 = client.create_guild(&name2, &description2, &owner);
+        let guild_id_2 = client.create_guild(
+            &name2,
+            &description2,
+            &owner,
+            &Some(valid_proof(&env, 1002)),
+        );
 
         // Guild IDs should be unique and incremental
         assert_eq!(guild_id_1, 1u64);
@@ -2685,7 +2795,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         // Owner adds admin
         let result = client.add_member(&guild_id, &admin, &Role::Admin, &owner);
@@ -2707,7 +2818,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         // Add member once
         client.add_member(&guild_id, &admin, &Role::Member, &owner);
@@ -2728,7 +2840,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         // Add admin
         client.add_member(&guild_id, &admin, &Role::Admin, &owner);
@@ -2752,7 +2865,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         // Add member
         client.add_member(&guild_id, &member, &Role::Member, &owner);
@@ -2777,7 +2891,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         // Add member
         client.add_member(&guild_id, &member, &Role::Member, &owner);
@@ -2806,7 +2921,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         // Add member
         client.add_member(&guild_id, &member, &Role::Member, &owner);
@@ -2832,7 +2948,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         // Try to remove the only owner - should panic
         client.remove_member(&guild_id, &owner, &owner);
@@ -2850,7 +2967,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         // Add member and admin
         client.add_member(&guild_id, &member, &Role::Member, &owner);
@@ -2873,7 +2991,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         // Add member
         client.add_member(&guild_id, &member, &Role::Member, &owner);
@@ -2898,7 +3017,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         // Add members
         client.add_member(&guild_id, &member1, &Role::Member, &owner);
@@ -2920,7 +3040,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         // Add admin
         client.add_member(&guild_id, &admin, &Role::Admin, &owner);
@@ -2940,7 +3061,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner1);
+        let guild_id =
+            client.create_guild(&name, &description, &owner1, &Some(valid_proof(&env, 2001)));
 
         // Add owner2
         client.add_member(&guild_id, &owner2, &Role::Owner, &owner1);
@@ -2963,7 +3085,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         client.add_member(&guild_id, &member, &Role::Member, &owner);
 
@@ -2984,7 +3107,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         client.add_member(&guild_id, &member, &Role::Member, &owner);
 
@@ -3002,7 +3126,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         // Initially should have 1 member (owner)
         let members = client.get_all_members(&guild_id);
@@ -3029,7 +3154,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         assert_eq!(client.is_member(&guild_id, &owner), true);
         assert_eq!(client.is_member(&guild_id, &member), false);
@@ -3052,7 +3178,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         client.add_member(&guild_id, &admin, &Role::Admin, &owner);
         client.add_member(&guild_id, &member, &Role::Member, &owner);
@@ -3132,7 +3259,8 @@ mod tests {
 
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         client.add_member(&guild_id, &admin, &Role::Admin, &owner);
 
@@ -3154,7 +3282,8 @@ mod tests {
 
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         client.add_member(&guild_id, &admin, &Role::Admin, &owner);
         client.add_member(&guild_id, &member, &Role::Member, &owner);
@@ -3178,7 +3307,8 @@ mod tests {
 
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         client.add_member(&guild_id, &admin, &Role::Admin, &owner);
 
@@ -3237,7 +3367,8 @@ mod tests {
         let name = String::from_str(&env, "Community Guild");
         let description = String::from_str(&env, "A thriving community");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
         assert_eq!(guild_id, 1u64);
 
         // Add admin
@@ -3276,7 +3407,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         // Add admin
         client.add_member(&guild_id, &admin, &Role::Admin, &owner);
@@ -3305,7 +3437,8 @@ mod tests {
         let name = String::from_str(&env, "Guild");
         let description = String::from_str(&env, "Description");
 
-        let guild_id = client.create_guild(&name, &description, &owner);
+        let guild_id =
+            client.create_guild(&name, &description, &owner, &Some(valid_proof(&env, 9000)));
 
         // Add admin
         client.add_member(&guild_id, &admin, &Role::Admin, &owner);

@@ -11,6 +11,7 @@ mod tests {
     use crate::payment::types::DistributionRule;
     use crate::upgrade::types::Version;
     use crate::utils::errors::IntegrationErrorCode;
+    use crate::InitializerProof;
     use crate::{guild::types::Role, StellarGuildsContract, StellarGuildsContractClient};
     use soroban_sdk::testutils::Address as _;
     use soroban_sdk::xdr::{Hash, ScAddress};
@@ -189,6 +190,7 @@ mod tests {
             &String::from_str(&env, "Core Guild"),
             &String::from_str(&env, "Main guild"),
             &admin,
+            &None::<InitializerProof>,
         );
 
         client.register_contract(
@@ -224,6 +226,7 @@ mod tests {
             &String::from_str(&env, "Bounty Guild"),
             &String::from_str(&env, "Guild with bounty"),
             &admin,
+            &None::<InitializerProof>,
         );
 
         let bounty_id = client.create_bounty(
@@ -262,6 +265,7 @@ mod tests {
             &String::from_str(&env, "Secure Guild"),
             &String::from_str(&env, "Auth checks"),
             &admin,
+            &None::<InitializerProof>,
         );
 
         client.register_contract(
@@ -351,6 +355,7 @@ mod tests {
             &String::from_str(&env, "Integration Guild"),
             &String::from_str(&env, "bounty -> treasury -> payment"),
             &admin,
+            &None::<InitializerProof>,
         );
         let bounty_id = hub.create_bounty(
             &guild_id,

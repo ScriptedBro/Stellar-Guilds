@@ -17,7 +17,7 @@ export const AchievementGrid: React.FC<AchievementGridProps> = ({
   achievements,
 }) => {
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 transition-shadow duration-300 hover:shadow-xl">
+    <div className="rounded-2xl bg-slate-900/40 p-6 shadow-sm border border-white/5 transition-shadow duration-300 hover:shadow-xl">
       <h3 className="mb-4 text-lg font-bold text-white">Achievements</h3>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
         {achievements.map((achievement) => {
@@ -29,8 +29,8 @@ export const AchievementGrid: React.FC<AchievementGridProps> = ({
               className={clsx(
                 "group relative flex flex-col items-center justify-center rounded-xl border p-4 text-center transition-all",
                 achievement.unlocked
-                  ? "border-blue-100 bg-blue-50/50 hover:border-blue-300 hover:bg-blue-50"
-                  : "border-gray-200 bg-gray-50 grayscale"
+                  ? "border-blue-500/20 bg-blue-500/5 hover:border-blue-500/40 hover:bg-blue-500/10"
+                  : "border-white/5 bg-white/5 grayscale"
               )}
               title={achievement.description}
             >

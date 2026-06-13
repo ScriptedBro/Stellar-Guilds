@@ -1,4 +1,4 @@
-﻿//! Milestone Tracking Contract Tests
+//! Milestone Tracking Contract Tests
 //!
 //! Comprehensive test coverage for project creation, milestone management,
 //! sequential/parallel flows, submissions, approvals, and progress tracking.
@@ -7,6 +7,7 @@
 
 use crate::guild::types::Role;
 use crate::milestone::types::{MilestoneInput, MilestoneStatus};
+use crate::InitializerProof;
 use crate::StellarGuildsContract;
 use crate::StellarGuildsContractClient;
 use soroban_sdk::testutils::{Address as _, Ledger, LedgerInfo};
@@ -43,7 +44,7 @@ fn register_and_init_contract(env: &Env) -> Address {
 fn setup_guild(client: &StellarGuildsContractClient<'_>, env: &Env, owner: &Address) -> u64 {
     let name = String::from_str(env, "Dev Guild");
     let description = String::from_str(env, "Developer Guild");
-    client.create_guild(&name, &description, owner)
+    client.create_guild(&name, &description, owner, &None::<InitializerProof>)
 }
 
 fn add_admin(

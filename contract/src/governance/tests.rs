@@ -6,6 +6,7 @@ mod tests {
     };
     use crate::governance::{proposals, storage};
     use crate::guild::types::Role;
+    use crate::InitializerProof;
     use crate::StellarGuildsContract;
     use crate::StellarGuildsContractClient;
     use soroban_sdk::testutils::{Address as _, Ledger, LedgerInfo};
@@ -40,7 +41,7 @@ mod tests {
     fn setup_guild(client: &StellarGuildsContractClient<'_>, env: &Env, owner: &Address) -> u64 {
         let name = String::from_str(env, "Gov Guild");
         let desc = String::from_str(env, "Governance test guild");
-        client.create_guild(&name, &desc, owner)
+        client.create_guild(&name, &desc, owner, &None::<InitializerProof>)
     }
 
     fn setup_guild_with_members(
