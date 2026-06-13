@@ -13,7 +13,7 @@ export const mockGuilds: Guild[] = [
     memberCount: 127,
     reputation: 95,
     createdAt: '2024-01-15',
-    logo: '/avatars/guild1.png'
+    logo: '/guild logo.jpg'
   },
   {
     id: 'guild-2',
@@ -23,7 +23,7 @@ export const mockGuilds: Guild[] = [
     memberCount: 89,
     reputation: 98,
     createdAt: '2023-11-22',
-    logo: '/avatars/guild2.png'
+    logo: '/guild logo.jpg'
   },
   {
     id: 'guild-3',
@@ -33,7 +33,7 @@ export const mockGuilds: Guild[] = [
     memberCount: 203,
     reputation: 87,
     createdAt: '2024-03-08',
-    logo: '/avatars/guild3.png'
+    logo: '/guild logo.jpg'
   },
   {
     id: 'guild-4',
@@ -43,7 +43,7 @@ export const mockGuilds: Guild[] = [
     memberCount: 45,
     reputation: 76,
     createdAt: '2024-05-12',
-    logo: '/avatars/guild4.png'
+    logo: '/guild logo.jpg'
   }
 ]
 
@@ -148,7 +148,7 @@ export const generateRandomGuild = (): Guild => {
     memberCount: Math.floor(Math.random() * 300) + 10,
     reputation: Math.floor(Math.random() * 100),
     createdAt: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    logo: `/avatars/guild${Math.floor(Math.random() * 4) + 1}.png`
+    logo: '/guild logo.jpg'
   }
 }
 

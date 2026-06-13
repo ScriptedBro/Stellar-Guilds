@@ -3,6 +3,7 @@
 import React from 'react'
 import { Menu, X, Vote } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useSidebarStore } from '@/store/sidebarStore'
 import { cn } from '@/lib/utils'
 import { WalletConnectButton } from '@/components/WalletConnector/WalletConnectButton'
@@ -32,8 +33,8 @@ const Header = ({ className }: HeaderProps) => {
           </button>
 
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gold-500 to-gold-700 flex items-center justify-center">
-              <span className="text-stellar-navy font-bold text-sm">SG</span>
+            <div className="w-8 h-8 rounded-lg overflow-hidden border border-slate-700/50 flex items-center justify-center bg-slate-800 relative">
+              <Image src="/guild logo.jpg" alt="SG" width={32} height={32} className="w-full h-full object-cover" />
             </div>
             <h1 className="text-xl font-bold text-stellar-white">Stellar Guilds</h1>
           </div>
@@ -46,7 +47,11 @@ const Header = ({ className }: HeaderProps) => {
 
           <div className="ml-4 flex items-center space-x-3">
             <ThemeToggle />
-            <button className="p-2 rounded-full hover:bg-stellar-lightNavy transition-colors">
+            <button
+              className="p-2 rounded-full hover:bg-stellar-lightNavy transition-colors"
+              aria-label="Open governance"
+              title="Open governance"
+            >
               <Vote size={20} className="text-stellar-slate" />
             </button>
             <WalletConnectButton />

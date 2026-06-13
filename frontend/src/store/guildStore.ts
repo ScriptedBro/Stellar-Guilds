@@ -60,7 +60,7 @@ export const useGuildStore = create<GuildState>((set, get) => ({
           memberCount: 1,
           reputation: 0,
           createdAt: new Date().toISOString().split('T')[0],
-          logo: data.logo || undefined,
+          logo: data.logo || '/guild logo.jpg',
           category: data.category,
           members: [
             {

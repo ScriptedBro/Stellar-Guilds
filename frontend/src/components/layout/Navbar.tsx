@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Image from 'next/image';
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,8 +17,11 @@ export const Navbar = () => {
         <div className="flex justify-between h-16 items-center">
           
           {/* Logo Section */}
-          <div className="flex-shrink-0 flex items-center">
-            <span className="text-2xl font-bold text-blue-600">LOGO</span>
+          <div className="flex-shrink-0 flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center bg-slate-100 relative">
+              <Image src="/guild logo.jpg" alt="Logo" width={32} height={32} className="w-full h-full object-cover" />
+            </div>
+            <span className="text-xl font-bold text-blue-600">Stellar Guilds</span>
           </div>
 
           {/* Desktop Menu */}

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Sparkles } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui";
 import Link from "next/link";
+import Image from "next/image";
 import LanguageSelector from "@/components/LanguageSelector";
 import { useTranslations } from 'next-intl';
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -48,8 +49,8 @@ export default function Navbar() {
             <div className="flex items-center gap-3">
               <div className="relative">
                 <div className="absolute inset-0 bg-violet-500 blur-lg opacity-50" />
-                <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-violet-800 flex items-center justify-center border border-violet-400/30">
-                  <Sparkles className="w-5 h-5 text-white" />
+                <div className="relative w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center border border-violet-400/30 bg-slate-900">
+                  <Image src="/guild logo.jpg" alt="Logo" width={40} height={40} className="w-full h-full object-cover" />
                 </div>
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">

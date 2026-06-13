@@ -183,7 +183,7 @@ export const mockGuildDetails: GuildDetail[] = [
     memberCount: 127,
     reputation: 95,
     createdAt: '2024-01-15',
-    logo: '/avatars/guild1.png',
+    logo: '/guild logo.jpg',
     category: 'Development',
     members: mockGuildMembers['guild-1'],
     activities: mockGuildActivities['guild-1']
@@ -196,7 +196,7 @@ export const mockGuildDetails: GuildDetail[] = [
     memberCount: 89,
     reputation: 98,
     createdAt: '2023-11-22',
-    logo: '/avatars/guild2.png',
+    logo: '/guild logo.jpg',
     category: 'Development',
     members: mockGuildMembers['guild-2'],
     activities: mockGuildActivities['guild-2']
@@ -209,7 +209,7 @@ export const mockGuildDetails: GuildDetail[] = [
     memberCount: 203,
     reputation: 87,
     createdAt: '2024-03-08',
-    logo: '/avatars/guild3.png',
+    logo: '/guild logo.jpg',
     category: 'Education',
     members: mockGuildMembers['guild-3'],
     activities: mockGuildActivities['guild-3']
@@ -222,7 +222,7 @@ export const mockGuildDetails: GuildDetail[] = [
     memberCount: 45,
     reputation: 76,
     createdAt: '2024-05-12',
-    logo: '/avatars/guild4.png',
+    logo: '/guild logo.jpg',
     category: 'DeFi',
     members: mockGuildMembers['guild-4'],
     activities: mockGuildActivities['guild-4']
